@@ -112,7 +112,7 @@ def infer_style(git_store, json_store):
                                       'style.json')
         os.makedirs(os.path.dirname(json_stat_file), exist_ok=True)
         with open(json_stat_file, 'w') as json_stats:
-            json.dump(style, json_stats, indent=4)
+            json.dump(style, json_stats, indent=4, sort_keys=True)
 
 
 def main(args):

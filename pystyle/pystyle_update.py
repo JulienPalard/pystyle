@@ -50,6 +50,10 @@ def parse_args(args):
         action='store_const',
         const=logging.DEBUG)
     parser.add_argument(
+        'git_store',
+        metavar='./git-clones/',
+        help='Directory where git clones are stored.')
+    parser.add_argument(
         'json_store',
         help='Where to put the style files.')
     return parser.parse_args(args)
@@ -98,10 +102,10 @@ def infer_style_of_repo(path):
     return style
 
 
-def infer_style(json_store):
+def infer_style(git_store, json_store):
     """Compute stats file from a bunch of clones.
     """
-    for path in glob.glob('./git-clones/*/*/'):
+    for path in glob.glob(git_store + '/*/*/'):
         style = infer_style_of_repo(path)
         json_stat_file = os.path.join(json_store,
                                       *path.split('/')[-3:-1],
@@ -120,7 +124,7 @@ def main(args):
     args = parse_args(args)
     os.environ['GIT_ASKPASS'] = '/bin/true'
     setup_logging(args.loglevel)
-    infer_style(args.json_store)
+    infer_style(args.git_store, args.json_store)
 
 
 def run():

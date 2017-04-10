@@ -57,12 +57,12 @@ def parse_args(args):
         metavar='https://github.com/julienpalard/pystyle/',
         type=str)
     parser.add_argument(
-        '--from-pypi',
-        help='Crawl pypi',
-        action='store_true')
-    parser.add_argument(
         '--pypi-project',
         help='Fetch a single PyPI project')
+    parser.add_argument(
+        'git_store',
+        metavar='./git-clones/',
+        help='Directory to store git clones.')
     return parser.parse_args(args)
 
 
@@ -100,15 +100,15 @@ def git_clone_or_update(clone_url, clone_path):
                        stdin=subprocess.DEVNULL, check=True)
     except subprocess.CalledProcessError:
         _logger.error("Clone failed for repo %s", clone_url)
-        shutil.rmtree(clone_path)
+        shutil.rmtree(clone_path, ignore_errors=True)
 
 
-def clone_repository(github_project_url):
+def clone_repository(git_store, github_project_url):
     """Clone or update the given github project by URL.
     """
     github_project_url = github_project_url.rstrip('/')
     clone_path = os.path.join(
-        "./git-clones/",
+        git_store,
         urlparse(github_project_url).path[1:])
     clone_url = github_project_url + '.git'
     git_clone_or_update(clone_url, clone_path)
@@ -131,14 +131,14 @@ def pypi_url_to_github_url(pypi_package_url):
             return sorted(found_github, key=len)[0]
 
 
-def crawl_pypi_project(pypi_package_url):
+def crawl_pypi_project(git_store, pypi_package_url):
     """Crawl a PyPI package by trying to find it upstream git and cloning
     it.
     """
     _logger.info("Crawling %s", pypi_package_url)
     github_project_url = pypi_url_to_github_url(pypi_package_url)
     if github_project_url:
-        clone_repository(github_project_url)
+        clone_repository(git_store, github_project_url)
 
 
 def crawl_pypi():
@@ -163,13 +163,13 @@ def main(args):
     setup_logging(args.loglevel)
     _logger.debug("Starting...")
     if args.repository:
-        clone_repository(args.repository)
-    if args.from_pypi:
+        clone_repository(args.git_store, args.repository)
+    elif args.pypi_project:
+        crawl_pypi_project(args.git_store, args.pypi_project)
+    else:
         pypi_projects = crawl_pypi()
         for pypi_project in pypi_projects:
-            crawl_pypi_project(pypi_project)
-    if args.pypi_project:
-        crawl_pypi_project(args.pypi_project)
+            crawl_pypi_project(args.git_store, pypi_project)
     _logger.debug("Script ends here")
 
 

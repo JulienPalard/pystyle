@@ -1,15 +1,15 @@
-==================
-python_style_stats
-==================
+=======
+pystyle
+=======
 
-
-Compute stats about style used in Python projects
+Extract style informations about Python projects.
 
 
 Description
 ===========
 
-A longer description of your project goes here...
+Run ``pystyle-crawl --from-pypi`` to crawl and clone some Python repo, then use
+``pystyle-stats`` to extract features about them.
 
 
 Note

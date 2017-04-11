@@ -103,13 +103,10 @@ def git_clone_or_update(clone_url, clone_path):
         shutil.rmtree(clone_path, ignore_errors=True)
 
 
-def clone_repository(git_store, github_project_url):
+def clone_repository(clone_path, github_project_url):
     """Clone or update the given github project by URL.
     """
     github_project_url = github_project_url.rstrip('/')
-    clone_path = os.path.join(
-        git_store,
-        urlparse(github_project_url).path[1:])
     clone_url = github_project_url + '.git'
     git_clone_or_update(clone_url, clone_path)
 
@@ -138,7 +135,11 @@ def crawl_pypi_project(git_store, pypi_package_url):
     _logger.info("Crawling %s", pypi_package_url)
     github_project_url = pypi_url_to_github_url(pypi_package_url)
     if github_project_url:
-        clone_repository(git_store, github_project_url)
+        clone_path = os.path.join(
+            git_store,
+            urlparse(github_project_url).path[1:])
+        clone_repository(clone_path, github_project_url)
+
 
 
 def crawl_pypi():

@@ -12,6 +12,8 @@ import logging
 import argparse
 
 from pystyle import __version__
+import licensename
+
 
 __author__ = "Julien Palard"
 __copyright__ = "Julien Palard"
@@ -70,36 +72,72 @@ def setup_logging(loglevel):
                         format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
 
 
-def infer_style_of_repo(path):
-    """Given a path to a git clone, compute some stats about the project.
+def has_typical_dirs(repo_path):
+    """Given a path to a git clone, returns a dict of present/absent directories.
+    """
+    typical_files = ('doc/',
+                     'docs/',
+                     'examples/',
+                     'src/',
+                     'test/',
+                     'tests/')
+    return {typical_dir: os.path.isdir(os.path.join(repo_path, typical_dir))
+            for typical_dir in typical_files}
+
+
+def has_typical_files(repo_path):
+    """Given a path to a git clone, returns a dict of present/absent files.
     """
     typical_files = ('.gitignore',
                      'AUTHORS.md',
                      'AUTHORS.rst',
-                     'docs/',
+                     'CHANGELOG.md',
+                     'CHANGELOG.rst',
                      'CONTRIBUTING.md',
                      'CONTRIBUTING.rst',
                      'LICENSE',
+                     'LICENSE.txt',
                      'MANIFEST.in',
+                     'pytest.ini',
                      'README',
                      'README.md',
                      'README.rst',
                      'requirements.txt',
                      'setup.cfg',
                      'setup.py',
-                     'tests/',
                      'test-requirements.txt',
                      'tox.ini',
                      'Makefile')
-    style = {'has_file': {}, 'has_dir': {}}
-    for typical_file in typical_files:
-        if typical_file[-1] == '/':
-            style['has_dir'][typical_file] = os.path.isdir(
-                os.path.join(path, typical_file))
-        else:
-            style['has_file'][typical_file] = os.path.isfile(
-                os.path.join(path, typical_file))
-    return style
+    return {typical_file: os.path.isfile(os.path.join(repo_path, typical_file))
+            for typical_file in typical_files}
+
+
+def infer_license(repo_path):
+    """Given a repository path, try to locate the license and infer it.
+    """
+    probable_license_files = ('LICENSE', 'LICENSE.txt',
+                              'LICENCE', 'LICENCE.txt')
+    for probable_license_file in probable_license_files:
+        license_path = os.path.join(repo_path, probable_license_file)
+        try:
+            license_name = licensename.from_file(license_path)
+            if license_name is not None:
+                return license_name
+            else:
+                _logger.warning("Unknown license for %s", license_path)
+
+        except FileNotFoundError:
+            continue
+
+
+def infer_style_of_repo(path):
+    """Try to infer some basic properties of a Python project like
+    presence or absence of typical files, license, …
+
+    """
+    return {'has_file': has_typical_files(path),
+            'has_dir': has_typical_dirs(path),
+            'license': infer_license(path)}
 
 
 def infer_style(git_store, json_store):

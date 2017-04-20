@@ -126,7 +126,7 @@ def infer_license(repo_path):
             else:
                 _logger.warning("Unknown license for %s", license_path)
 
-        except FileNotFoundError:
+        except (FileNotFoundError, UnicodeDecodeError):
             continue
 
 

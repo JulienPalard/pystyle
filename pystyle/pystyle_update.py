@@ -10,6 +10,7 @@ import glob
 import json
 import logging
 import argparse
+from collections import Counter
 
 from pystyle import __version__
 import licensename
@@ -130,6 +131,24 @@ def infer_license(repo_path):
             continue
 
 
+def count_lines_of_code(path):
+    source_files = glob.glob(os.path.join(path, '**', '*.*'), recursive=True)
+    lines_counter = Counter()
+    for source_file in source_files:
+        if '.git' in source_file:
+            continue
+        try:
+            with open(source_file) as opened_file:
+                lines_counter[source_file.split('.')[-1]] += len(
+                    opened_file.readlines())
+        except (UnicodeDecodeError, IsADirectoryError,
+                FileNotFoundError, OSError):
+            # We may open issues for broken symlinks þ
+            # Open issue also for symlinks loops?
+            pass
+    return dict(lines_counter)
+
+
 def infer_style_of_repo(path):
     """Try to infer some basic properties of a Python project like
     presence or absence of typical files, license, …
@@ -137,7 +156,8 @@ def infer_style_of_repo(path):
     """
     return {'has_file': has_typical_files(path),
             'has_dir': has_typical_dirs(path),
-            'license': infer_license(path)}
+            'license': infer_license(path),
+            'lines_of_code': count_lines_of_code(path)}
 
 
 def infer_style(git_store, json_store):

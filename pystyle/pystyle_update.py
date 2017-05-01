@@ -53,6 +53,9 @@ def parse_args(args):
         action='store_const',
         const=logging.DEBUG)
     parser.add_argument(
+        '--only',
+        help="Only run updates matching the given pattern")
+    parser.add_argument(
         'git_store',
         metavar='./git-clones/',
         help='Directory where git clones are stored.')
@@ -149,28 +152,72 @@ def count_lines_of_code(path):
     return dict(lines_counter)
 
 
-def infer_style_of_repo(path):
+def count_shebangs(path):
+    source_files = glob.glob(os.path.join(path, '**', '*.py'), recursive=True)
+    shebang_counter = Counter()
+    for source_file in source_files:
+        try:
+            with open(source_file) as opened_file:
+                first_line = opened_file.readline()
+            if '#!' in first_line:
+                shebang_counter[first_line[:-1]] += 1
+        except (UnicodeDecodeError, IsADirectoryError,
+                FileNotFoundError, OSError):
+            # We may open issues for broken symlinks þ
+            pass
+    return dict(shebang_counter)
+
+
+def count_pep8_infringement(path):
+    import subprocess
+    pycodestyle_result = subprocess.run(
+        ['pycodestyle', '--exclude=.git', '--statistics', '--count', path],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        universal_newlines=True)
+    if not pycodestyle_result.stderr:
+        return 0
+    try:
+        return int(pycodestyle_result.stderr)
+    except ValueError:
+        # Probably just a warning about pycodestyle itself.
+        return 0
+
+
+def infer_style_of_repo(path, only=None):
     """Try to infer some basic properties of a Python project like
     presence or absence of typical files, license, …
-
     """
-    return {'has_file': has_typical_files(path),
-            'has_dir': has_typical_dirs(path),
-            'license': infer_license(path),
-            'lines_of_code': count_lines_of_code(path)}
+    methods = {'has_file': has_typical_files,
+               'has_dir': has_typical_dirs,
+               'license': infer_license,
+               'lines_of_code': count_lines_of_code,
+               'pep8_infringement': count_pep8_infringement,
+               'shebang': count_shebangs}
+    return {key: method(path) for key, method in methods.items() if
+            only is None or only in key}
 
 
-def infer_style(git_store, json_store):
+def infer_style(git_store, json_store, only=None):
     """Compute stats file from a bunch of clones.
     """
     for path in glob.glob(git_store + '/*/*/'):
-        style = infer_style_of_repo(path)
-        json_stat_file = os.path.join(json_store,
-                                      *path.split('/')[-3:-1],
-                                      'style.json')
-        os.makedirs(os.path.dirname(json_stat_file), exist_ok=True)
-        with open(json_stat_file, 'w') as json_stats:
+        style_json_path = os.path.join(json_store,
+                                       *path.split('/')[-3:-1],
+                                       'style.json')
+        if not os.path.exists(style_json_path) and only is not None:
+            continue  # Do not create partial json files.
+        os.makedirs(os.path.dirname(style_json_path), exist_ok=True)
+        style = infer_style_of_repo(path, only)
+        if os.path.exists(style_json_path):
+            with open(style_json_path, 'r') as json_stats:
+                old_style = json.load(json_stats)
+            old_style.update(style)
+            style = old_style
+        with open(style_json_path, 'w') as json_stats:
             json.dump(style, json_stats, indent=4, sort_keys=True)
+
+
 
 
 def main(args):
@@ -182,7 +229,7 @@ def main(args):
     args = parse_args(args)
     os.environ['GIT_ASKPASS'] = '/bin/true'
     setup_logging(args.loglevel)
-    infer_style(args.git_store, args.json_store)
+    infer_style(args.git_store, args.json_store, args.only)
 
 
 def run():

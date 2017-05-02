@@ -168,6 +168,16 @@ def count_shebangs(path):
     return dict(shebang_counter)
 
 
+def infer_install_requires(path):
+    import requirements_detector
+    try:
+        return [str(requirement) for requirement in
+                requirements_detector.find_requirements(path)]
+    except requirements_detector.detect.RequirementsNotFound:
+        return []
+
+
+
 def count_pep8_infringement(path):
     import subprocess
     pycodestyle_result = subprocess.run(
@@ -193,7 +203,8 @@ def infer_style_of_repo(path, only=None):
                'license': infer_license,
                'lines_of_code': count_lines_of_code,
                'pep8_infringement': count_pep8_infringement,
-               'shebang': count_shebangs}
+               'shebang': count_shebangs,
+               'install_requires': infer_install_requires}
     return {key: method(path) for key, method in methods.items() if
             only is None or only in key}
 
@@ -210,10 +221,13 @@ def infer_style(git_store, json_store, only=None):
         os.makedirs(os.path.dirname(style_json_path), exist_ok=True)
         style = infer_style_of_repo(path, only)
         if os.path.exists(style_json_path):
-            with open(style_json_path, 'r') as json_stats:
-                old_style = json.load(json_stats)
-            old_style.update(style)
-            style = old_style
+            try:
+                with open(style_json_path, 'r') as json_stats:
+                    old_style = json.load(json_stats)
+                old_style.update(style)
+                style = old_style
+            except json.decoder.JSONDecodeError:
+                print("Malformed json in {}".format(style_json_path))
         with open(style_json_path, 'w') as json_stats:
             json.dump(style, json_stats, indent=4, sort_keys=True)
 

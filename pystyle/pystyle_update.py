@@ -168,7 +168,7 @@ def count_shebangs(path):
     return dict(shebang_counter)
 
 
-def infer_install_requires(path):
+def infer_requirements(path):
     import requirements_detector
     try:
         return [str(requirement) for requirement in
@@ -204,7 +204,7 @@ def infer_style_of_repo(path, only=None):
                'lines_of_code': count_lines_of_code,
                'pep8_infringement': count_pep8_infringement,
                'shebang': count_shebangs,
-               'install_requires': infer_install_requires}
+               'requirements': infer_requirements}
     return {key: method(path) for key, method in methods.items() if
             only is None or only in key}
 

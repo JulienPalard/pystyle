@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Crawler of Python project, parsing Pypi and cloning their git repo.
+"""
 
 import os
 import re
@@ -14,7 +16,7 @@ import requests
 
 from pystyle import __version__
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def parse_args(args):
@@ -80,8 +82,11 @@ def is_github_project_url(url):
 
 
 def git_clone_or_update(clone_url, clone_path):
+    """Wrapper around git clone / git pull, just try to get an up-to-date
+    repo.
+    """
     if os.path.isdir(clone_path):
-        _logger.debug("Git pull on: %s", clone_path)
+        logger.debug("Git pull on: %s", clone_path)
         try:
             subprocess.run(['git', '-C', clone_path, 'pull', '--ff-only'],
                            check=True)
@@ -89,12 +94,12 @@ def git_clone_or_update(clone_url, clone_path):
         except subprocess.CalledProcessError:
             shutil.rmtree(clone_path)
     os.makedirs(clone_path)
-    _logger.debug("Git clone: %s", clone_url)
+    logger.debug("Git clone: %s", clone_url)
     try:
         subprocess.run(['git', 'clone', '--depth', '1', clone_url, clone_path],
                        stdin=subprocess.DEVNULL, check=True)
     except subprocess.CalledProcessError:
-        _logger.error("Clone failed for repo %s", clone_url)
+        logger.error("Clone failed for repo %s", clone_url)
         shutil.rmtree(clone_path, ignore_errors=True)
 
 
@@ -121,20 +126,20 @@ def pypi_url_to_github_url(pypi_package_url):
             project_text)
         if found_github:
             return sorted(found_github, key=len)[0]
+    return None
 
 
 def crawl_pypi_project(git_store, pypi_package_url):
     """Crawl a PyPI package by trying to find it upstream git and cloning
     it.
     """
-    _logger.info("Crawling %s", pypi_package_url)
+    logger.info("Crawling %s", pypi_package_url)
     github_project_url = pypi_url_to_github_url(pypi_package_url)
     if github_project_url:
         clone_path = os.path.join(
             git_store,
             urlparse(github_project_url).path[1:])
         clone_repository(clone_path, github_project_url)
-
 
 
 def crawl_pypi():
@@ -157,7 +162,7 @@ def main(args):
     args = parse_args(args)
     os.environ['GIT_ASKPASS'] = '/bin/true'
     setup_logging(args.loglevel)
-    _logger.debug("Starting...")
+    logger.debug("Starting...")
     if args.repository:
         clone_repository(args.git_store, args.repository)
     elif args.pypi_project:
@@ -166,7 +171,7 @@ def main(args):
         pypi_projects = crawl_pypi()
         for pypi_project in pypi_projects:
             crawl_pypi_project(args.git_store, pypi_project)
-    _logger.debug("Script ends here")
+    logger.debug("Script ends here")
 
 
 def run():

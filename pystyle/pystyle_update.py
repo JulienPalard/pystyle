@@ -15,7 +15,7 @@ from pystyle import __version__
 import licensename
 
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def parse_args(args):
@@ -72,7 +72,8 @@ def setup_logging(loglevel):
 
 
 def has_typical_dirs(repo_path):
-    """Given a path to a git clone, returns a dict of present/absent directories.
+    """Given a path to a git clone, returns a dict of present/absent
+    directories.
     """
     typical_files = ('doc/',
                      'docs/',
@@ -123,13 +124,16 @@ def infer_license(repo_path):
             if license_name is not None:
                 return license_name
             else:
-                _logger.warning("Unknown license for %s", license_path)
+                logger.warning("Unknown license for %s", license_path)
 
         except (FileNotFoundError, UnicodeDecodeError):
             continue
+    return None
 
 
 def count_lines_of_code(path):
+    """Basic line-of-code counter in a hierarchy.
+    """
     source_files = glob.glob(os.path.join(path, '**', '*.*'), recursive=True)
     lines_counter = Counter()
     for source_file in source_files:
@@ -148,6 +152,8 @@ def count_lines_of_code(path):
 
 
 def count_shebangs(path):
+    """Cound number of shebangs encontered in a hierarchy.
+    """
     source_files = glob.glob(os.path.join(path, '**', '*.py'), recursive=True)
     shebang_counter = Counter()
     for source_file in source_files:
@@ -164,6 +170,9 @@ def count_shebangs(path):
 
 
 def infer_requirements(path):
+    """Given the directory of a Python project, try to find its
+    requirements.
+    """
     import requirements_detector
     try:
         return [str(requirement) for requirement in
@@ -172,8 +181,9 @@ def infer_requirements(path):
         return []
 
 
-
 def count_pep8_infringement(path):
+    """Invoke pycodestyle on a path just to count number of infrigements.
+    """
     import subprocess
     pycodestyle_result = subprocess.run(
         ['pycodestyle', '--exclude=.git', '--statistics', '--count', path],
@@ -225,8 +235,6 @@ def infer_style(git_store, json_store, only=None):
                 print("Malformed json in {}".format(style_json_path))
         with open(style_json_path, 'w') as json_stats:
             json.dump(style, json_stats, indent=4, sort_keys=True)
-
-
 
 
 def main(args):

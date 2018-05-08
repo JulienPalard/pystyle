@@ -56,6 +56,7 @@ def parse_args(args):
         help='Directory where git clones are stored.')
     parser.add_argument(
         'json_store',
+        metavar='../pystyle-data/github.com/',
         help='Where to put the style files.')
     return parser.parse_args(args)
 

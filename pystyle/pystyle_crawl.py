@@ -11,6 +11,7 @@ import argparse
 import subprocess
 from urllib.parse import urlparse
 
+from bs4 import BeautifulSoup
 import feedparser
 import requests
 
@@ -78,7 +79,7 @@ def is_github_project_url(url):
     """Returns True if the URL looks like a github project URL. False
     otherwise.
     """
-    return re.match('https://github.com/[^/]*/[^/]*/?', url) is not None
+    return re.match('https://github.com/[^/]+/[^/]+/?', url) is not None
 
 
 def git_clone_or_update(clone_url, clone_path):
@@ -114,18 +115,13 @@ def clone_repository(clone_path, github_project_url):
 def pypi_url_to_github_url(pypi_package_url):
     """By querying the PyPI API, try to find the github page of a pypi project.
     """
-    project_response = requests.get(pypi_package_url + '/json')
-    project_json = project_response.json()
-    try:
-        if is_github_project_url(project_json['home_page']):
-            return project_json['home_page']
-    except KeyError:
-        project_text = project_response.text
-        found_github = re.findall(
-            'https://github.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/?',
-            project_text)
-        if found_github:
-            return sorted(found_github, key=len)[0]
+    project_response = requests.get(pypi_package_url)
+    soup = BeautifulSoup(project_response.content, "html5lib",
+                         from_encoding='UTF8')
+    for element in soup.select('div.sidebar-section a i.fa-github'):
+        github_url = element.parent.get('href')
+        if is_github_project_url(github_url):
+            return github_url
     return None
 
 
@@ -146,9 +142,9 @@ def crawl_pypi():
     """Crawl PyPI via RSS, return a list of pypi projects.
     """
     updates = feedparser.parse(
-        'https://pypi.python.org/pypi?%3Aaction=rss')
+        'https://pypi.org/rss/updates.xml')
     packages = feedparser.parse(
-        'https://pypi.python.org/pypi?%3Aaction=packages_rss')
+        'https://pypi.org/rss/packages.xml')
     return set(package['link'] for package in
                updates['items'] + packages['items'])
 

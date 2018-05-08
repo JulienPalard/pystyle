@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Looks for git clones and compute stats about them.
 """
@@ -15,10 +14,6 @@ from collections import Counter
 from pystyle import __version__
 import licensename
 
-
-__author__ = "Julien Palard"
-__copyright__ = "Julien Palard"
-__license__ = "mit"
 
 _logger = logging.getLogger(__name__)
 

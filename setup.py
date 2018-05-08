@@ -1,23 +1,52 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
-    Setup file for pystyle.
-
-    This file was generated with PyScaffold 2.5.7, a tool that easily
-    puts up a scaffold for your new Python project. Learn more under:
-    http://pyscaffold.readthedocs.org/
+"""setup.py for pystyle.
 """
 
-import sys
 from setuptools import setup
 
+with open('README.rst') as readme_file:
+    readme = readme_file.read()
 
-def setup_package():
-    needs_sphinx = {'build_sphinx', 'upload_docs'}.intersection(sys.argv)
-    sphinx = ['sphinx'] if needs_sphinx else []
-    setup(setup_requires=['six', 'pyscaffold>=2.5a0,<2.6a0'] + sphinx,
-          use_pyscaffold=True)
+setup(
+    name='pystyle',
+    version='0.0.1',
+    description="Extract style informations about Python projects.",
+    long_description=readme,
+    author="Julien Palard",
+    author_email='julien@palard.fr',
+    url='https://github.com/JulienPalard/pystyle/',
+    packages=[
+        'pystyle',
+    ],
+    entry_points={
+        'console_scripts': [
+            'pystyle-crawl=pystyle.pystyle_crawl:run',
+            'pystyle-update=pystyle.pystyle_update:run',
+        ]
+    },
+    install_requires=[
+        'feedparser==5.2.1',
+        'licensename==0.4.2',
+        'requests==2.18.4',
+        'requirements-detector==0.5.2',
 
-
-if __name__ == "__main__":
-    setup_package()
+    ],
+    extras_require={
+        'dev': [
+            'flake8==3.5.0',
+            'mypy==0.600',
+            'pylint==1.8.4',
+        ]
+    },
+    license="MIT license",
+    classifiers=[
+        'Development Status :: 2 - Pre-Alpha',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Natural Language :: English',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+    ]
+)

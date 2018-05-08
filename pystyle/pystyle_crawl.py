@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import os
 import re
@@ -14,10 +13,6 @@ import feedparser
 import requests
 
 from pystyle import __version__
-
-__author__ = "Julien Palard"
-__copyright__ = "Julien Palard"
-__license__ = "mit"
 
 _logger = logging.getLogger(__name__)
 

@@ -8,8 +8,10 @@ import sys
 import shutil
 import logging
 import argparse
+from pathlib import Path
 import subprocess
 from urllib.parse import urlparse
+from multiprocessing import Pool
 
 from bs4 import BeautifulSoup
 import feedparser
@@ -61,6 +63,9 @@ def parse_args(args):
         'git_store',
         metavar='./git-clones/',
         help='Directory to store git clones.')
+    parser.add_argument(
+        '--reclone',
+        help="Re clone from given pystyle-data to git_store.")
     return parser.parse_args(args)
 
 
@@ -104,11 +109,18 @@ def git_clone_or_update(clone_url, clone_path):
         shutil.rmtree(clone_path, ignore_errors=True)
 
 
-def clone_repository(clone_path, github_project_url):
+def clone_repository(github_project_url, clones_path=None, clone_path=None):
     """Clone or update the given github project by URL.
+    Give one of clones_path or clone_path:
+    - Will clone the project in a directory in clones_path.
+    - Or clone the project in clone_path.
     """
     github_project_url = github_project_url.rstrip('/')
     clone_url = github_project_url + '.git'
+    if clones_path:
+        clone_path = os.path.join(
+            clones_path,
+            urlparse(github_project_url).path[1:])
     git_clone_or_update(clone_url, clone_path)
 
 
@@ -132,10 +144,7 @@ def crawl_pypi_project(git_store, pypi_package_url):
     logger.info("Crawling %s", pypi_package_url)
     github_project_url = pypi_url_to_github_url(pypi_package_url)
     if github_project_url:
-        clone_path = os.path.join(
-            git_store,
-            urlparse(github_project_url).path[1:])
-        clone_repository(clone_path, github_project_url)
+        clone_repository(github_project_url, clones_path=git_store)
 
 
 def crawl_pypi():
@@ -160,9 +169,24 @@ def main(args):
     setup_logging(args.loglevel)
     logger.debug("Starting...")
     if args.repository:
-        clone_repository(args.git_store, args.repository)
+        clone_repository(args.repository, clones_path=args.git_store)
     elif args.pypi_project:
         crawl_pypi_project(args.git_store, args.pypi_project)
+    elif args.reclone:
+        pystyle_data_path = Path(args.reclone)
+        if (pystyle_data_path / Path('github.com')).exists():
+            github = pystyle_data_path / Path('github.com')
+        else:
+            github = pystyle_data_path
+        with Pool(processes=4) as pool:
+            for organisation in github.iterdir():
+                for project in organisation.iterdir():
+                    pool.apply_async(
+                        clone_repository,
+                        (f"https://github.com/{organisation.stem}/{project.stem}", ),
+                        {'clones_path': args.git_store})
+            pool.close()
+            pool.join()
     else:
         pypi_projects = crawl_pypi()
         for pypi_project in pypi_projects:

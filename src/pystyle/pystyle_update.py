@@ -228,7 +228,7 @@ def infer_style(git_store: Path, json_store: Path, only: str = None) -> None:
                 old_style.update(style)
                 style = old_style
             except json.decoder.JSONDecodeError:
-                logger.warning("Malformed json in {}".format(style_json_path))
+                logger.warning("Malformed json in %s", style_json_path)
         with open(style_json_path, 'w') as json_stats:
             json.dump(style, json_stats, indent=4, sort_keys=True)
 

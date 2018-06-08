@@ -100,7 +100,7 @@ def git_clone_or_update(clone_url, clone_path):
     os.makedirs(clone_path)
     logger.debug("Git clone: %s", clone_url)
     try:
-        subprocess.run(['git', 'clone', '--depth', '1', clone_url, clone_path],
+        subprocess.run(['git', 'clone', clone_url, clone_path],
                        stdin=subprocess.DEVNULL, check=True)
     except subprocess.CalledProcessError:
         logger.error("Clone failed for repo %s", clone_url)

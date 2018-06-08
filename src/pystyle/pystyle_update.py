@@ -219,8 +219,6 @@ def infer_style(git_store: Path, json_store: Path, only: str = None) -> None:
     for path in git_store.glob('*/*/'):
         style_json_path = (json_store / path.parts[-2] / path.parts[-1] /
                            'style.json')
-        if not style_json_path.exists() and only is not None:
-            continue  # Do not create partial json files
         style_json_path.parent.mkdir(parents=True, exist_ok=True)
         style = infer_style_of_repo(path, only)
         if style_json_path.exists():

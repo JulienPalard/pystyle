@@ -2,21 +2,22 @@
 """Crawler of Python project, parsing Pypi and cloning their git repo.
 """
 
+import argparse
+import logging
 import os
 import re
-import sys
 import shutil
-import logging
-import argparse
-from pathlib import Path
 import subprocess
-from urllib.parse import urlparse
+import sys
 from multiprocessing import Pool
+from pathlib import Path
+from typing import Union
+from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
 import feedparser
 import requests
-from typing import Union
+from bs4 import BeautifulSoup
+
 from pystyle import __version__
 
 logger = logging.getLogger(__name__)

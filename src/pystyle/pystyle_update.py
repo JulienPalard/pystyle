@@ -3,18 +3,18 @@
 """Looks for git clones and compute stats about them.
 """
 
-import os
-import sys
+import argparse
 import glob
 import json
 import logging
-import argparse
+import os
+import sys
 from collections import Counter
-from typing import List, Dict, Optional, Callable, Union
+from typing import Callable, Dict, List, Optional, Union
 
-from pystyle import __version__
 import licensename
 
+from pystyle import __version__
 
 logger = logging.getLogger(__name__)
 

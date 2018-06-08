@@ -7,10 +7,11 @@ import argparse
 import glob
 import json
 import logging
+from pathlib import Path
 import os
 import sys
 from collections import Counter
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union, Any
 
 import licensename
 
@@ -67,7 +68,7 @@ def setup_logging(loglevel: int) -> None:
                         format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
 
 
-def has_typical_dirs(repo_path: str) -> Dict[str, bool]:
+def has_typical_dirs(repo_path: Path) -> Dict[str, bool]:
     """Given a path to a git clone, returns a dict of present/absent
     directories.
     """
@@ -77,11 +78,11 @@ def has_typical_dirs(repo_path: str) -> Dict[str, bool]:
                      'src/',
                      'test/',
                      'tests/')
-    return {typical_dir: os.path.isdir(os.path.join(repo_path, typical_dir))
+    return {typical_dir: (repo_path / typical_dir).is_dir()
             for typical_dir in typical_files}
 
 
-def has_typical_files(repo_path: str) -> Dict[str, bool]:
+def has_typical_files(repo_path: Path) -> Dict[str, bool]:
     """Given a path to a git clone, returns a dict of present/absent files.
     """
     typical_files = ('.gitignore',
@@ -104,17 +105,17 @@ def has_typical_files(repo_path: str) -> Dict[str, bool]:
                      'test-requirements.txt',
                      'tox.ini',
                      'Makefile')
-    return {typical_file: os.path.isfile(os.path.join(repo_path, typical_file))
+    return {typical_file: (repo_path / typical_file).is_file()
             for typical_file in typical_files}
 
 
-def infer_license(repo_path: str) -> Optional[str]:
+def infer_license(repo_path: Path) -> Optional[str]:
     """Given a repository path, try to locate the license and infer it.
     """
     probable_license_files = ('LICENSE', 'LICENSE.txt',
                               'LICENCE', 'LICENCE.txt')
     for probable_license_file in probable_license_files:
-        license_path = os.path.join(repo_path, probable_license_file)
+        license_path = repo_path / probable_license_file
         try:
             license_name = licensename.from_file(license_path)
             if license_name is not None:
@@ -127,17 +128,17 @@ def infer_license(repo_path: str) -> Optional[str]:
     return None
 
 
-def count_lines_of_code(path: str) -> Dict[str, int]:
+def count_lines_of_code(path: Path) -> Dict[str, int]:
     """Basic line-of-code counter in a hierarchy.
     """
-    source_files = glob.glob(os.path.join(path, '**', '*.*'), recursive=True)
+    source_files = path.rglob('*.*')
     lines_counter: Dict[str, int] = Counter()
     for source_file in source_files:
-        if '.git' in source_file:
+        if '.git' in source_file.name:
             continue
         try:
             with open(source_file) as opened_file:
-                lines_counter[source_file.split('.')[-1]] += len(
+                lines_counter[source_file.suffix[1:]] += len(
                     opened_file.readlines())
         except (UnicodeDecodeError, IsADirectoryError,
                 FileNotFoundError, OSError):
@@ -147,10 +148,10 @@ def count_lines_of_code(path: str) -> Dict[str, int]:
     return dict(lines_counter)
 
 
-def count_shebangs(path: str) -> Dict[str, int]:
+def count_shebangs(path: Path) -> Dict[str, int]:
     """Cound number of shebangs encontered in a hierarchy.
     """
-    source_files = glob.glob(os.path.join(path, '**', '*.py'), recursive=True)
+    source_files = path.rglob('*.py')
     shebang_counter: Dict[str, int] = Counter()
     for source_file in source_files:
         try:
@@ -165,7 +166,7 @@ def count_shebangs(path: str) -> Dict[str, int]:
     return dict(shebang_counter)
 
 
-def infer_requirements(path: str) -> List[str]:
+def infer_requirements(path: Path) -> List[str]:
     """Given the directory of a Python project, try to find its
     requirements.
     """
@@ -177,7 +178,7 @@ def infer_requirements(path: str) -> List[str]:
         return []
 
 
-def count_pep8_infringement(path: str) -> int:
+def count_pep8_infringement(path: Path) -> int:
     """Invoke pycodestyle on a path just to count number of infrigements.
     """
     import subprocess
@@ -195,12 +196,12 @@ def count_pep8_infringement(path: str) -> int:
         return 0
 
 
-def infer_style_of_repo(path: str, only: Optional[str] = None) -> Dict[
+def infer_style_of_repo(path: Path, only: Optional[str] = None) -> Dict[
         str, Union[str, int]]:
     """Try to infer some basic properties of a Python project like
     presence or absence of typical files, license, …
     """
-    methods: Dict[str, Callable] = {
+    methods: Dict[str, Callable[[Path], Any]] = {
         'has_file': has_typical_files,
         'has_dir': has_typical_dirs,
         'license': infer_license,
@@ -212,18 +213,17 @@ def infer_style_of_repo(path: str, only: Optional[str] = None) -> Dict[
             only is None or only in key}
 
 
-def infer_style(git_store: str, json_store: str, only: str = None) -> None:
+def infer_style(git_store: Path, json_store: Path, only: str = None) -> None:
     """Compute stats file from a bunch of clones.
     """
-    for path in glob.glob(git_store + '/*/*/'):
-        style_json_path = os.path.join(json_store,
-                                       *path.split('/')[-3:-1],
-                                       'style.json')
-        if not os.path.exists(style_json_path) and only is not None:
-            continue  # Do not create partial json files.
-        os.makedirs(os.path.dirname(style_json_path), exist_ok=True)
+    for path in git_store.glob('*/*/'):
+        style_json_path = (json_store / path.parts[-2] / path.parts[-1] /
+                           'style.json')
+        if not style_json_path.exists() and only is not None:
+            continue  # Do not create partial json files
+        style_json_path.parent.mkdir(parents=True, exist_ok=True)
         style = infer_style_of_repo(path, only)
-        if os.path.exists(style_json_path):
+        if style_json_path.exists():
             try:
                 with open(style_json_path, 'r') as json_stats:
                     old_style = json.load(json_stats)
@@ -241,7 +241,7 @@ def main() -> None:
     args = parse_args()
     os.environ['GIT_ASKPASS'] = '/bin/true'
     setup_logging(args.loglevel)
-    infer_style(args.git_store, args.json_store, args.only)
+    infer_style(Path(args.git_store), Path(args.json_store), args.only)
 
 
 if __name__ == "__main__":

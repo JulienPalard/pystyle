@@ -7,11 +7,13 @@ import argparse
 import glob
 import json
 import logging
-from pathlib import Path
 import os
+import random
+import subprocess
 import sys
 from collections import Counter
-from typing import Callable, Dict, List, Optional, Union, Any
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import licensename
 
@@ -181,7 +183,6 @@ def infer_requirements(path: Path) -> List[str]:
 def count_pep8_infringement(path: Path) -> int:
     """Invoke pycodestyle on a path just to count number of infrigements.
     """
-    import subprocess
     pycodestyle_result = subprocess.run(
         ['pycodestyle', '--exclude=.git', '--statistics', '--count', path],
         stdout=subprocess.DEVNULL,
@@ -217,8 +218,18 @@ def infer_style(git_store: Path, json_store: Path, only: str = None) -> None:
     """Compute stats file from a bunch of clones.
     """
     for path in git_store.glob('*/*/'):
+        random_commit = random.choice(
+            [commit for commit in
+             subprocess.check_output(
+                 ('git', '-C', str(path), 'rev-list', 'origin/HEAD'),
+                 universal_newlines=True).split('\n') if commit])
+        subprocess.check_call(('git', '-C', str(path), 'checkout',
+                               random_commit))
+        commit_date = subprocess.check_output(
+            ('git', '-C', str(path), 'show', '--pretty=format:%cI', '-s'),
+            universal_newlines=True)
         style_json_path = (json_store / path.parts[-2] / path.parts[-1] /
-                           'style.json')
+                           commit_date + '.json')
         style_json_path.parent.mkdir(parents=True, exist_ok=True)
         style = infer_style_of_repo(path, only)
         if style_json_path.exists():

@@ -16,7 +16,7 @@ from multiprocessing import Pool
 from bs4 import BeautifulSoup
 import feedparser
 import requests
-
+from typing import Union
 from pystyle import __version__
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,23 @@ def crawl_pypi():
                updates['items'] + packages['items'])
 
 
+def reclone(git_store: str, pystyle_data_path: Union[str, Path]) -> None:
+    pystyle_data_path = Path(pystyle_data_path)
+    if (pystyle_data_path / Path('github.com')).exists():
+        github = pystyle_data_path / Path('github.com')
+    else:
+        github = pystyle_data_path
+    with Pool(processes=4) as pool:
+        for org in github.iterdir():
+            for project in org.iterdir():
+                pool.apply_async(
+                    clone_repository,
+                    (f"https://github.com/{org.stem}/{project.stem}", ),
+                    {'clones_path': git_store})
+        pool.close()
+        pool.join()
+
+
 def main():
     """Main entry point allowing external calls
     """
@@ -167,20 +184,7 @@ def main():
     elif args.pypi_project:
         crawl_pypi_project(args.git_store, args.pypi_project)
     elif args.reclone:
-        pystyle_data_path = Path(args.reclone)
-        if (pystyle_data_path / Path('github.com')).exists():
-            github = pystyle_data_path / Path('github.com')
-        else:
-            github = pystyle_data_path
-        with Pool(processes=4) as pool:
-            for organisation in github.iterdir():
-                for project in organisation.iterdir():
-                    pool.apply_async(
-                        clone_repository,
-                        (f"https://github.com/{organisation.stem}/{project.stem}", ),
-                        {'clones_path': args.git_store})
-            pool.close()
-            pool.join()
+        reclone(args.git_store, args.reclone)
     else:
         pypi_projects = crawl_pypi()
         for pypi_project in pypi_projects:

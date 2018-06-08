@@ -21,8 +21,8 @@ setup(
     package_dir = {'': 'src'},
     entry_points={
         'console_scripts': [
-            'pystyle-crawl=pystyle.pystyle_crawl:run',
-            'pystyle-update=pystyle.pystyle_update:run',
+            'pystyle-crawl=pystyle.pystyle_crawl:main',
+            'pystyle-update=pystyle.pystyle_update:main',
         ]
     },
     install_requires=[

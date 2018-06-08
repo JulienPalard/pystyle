@@ -22,11 +22,8 @@ from pystyle import __version__
 logger = logging.getLogger(__name__)
 
 
-def parse_args(args):
+def parse_args():
     """Parse command line parameters
-
-    Args:
-      args ([str]): command line parameters as list of strings
 
     Returns:
       :obj:`argparse.Namespace`: command line parameters namespace
@@ -66,7 +63,7 @@ def parse_args(args):
     parser.add_argument(
         '--reclone',
         help="Re clone from given pystyle-data to git_store.")
-    return parser.parse_args(args)
+    return parser.parse_args()
 
 
 def setup_logging(loglevel):
@@ -158,13 +155,10 @@ def crawl_pypi():
                updates['items'] + packages['items'])
 
 
-def main(args):
+def main():
     """Main entry point allowing external calls
-
-    Args:
-      args ([str]): command line parameter list
     """
-    args = parse_args(args)
+    args = parse_args()
     os.environ['GIT_ASKPASS'] = '/bin/true'
     setup_logging(args.loglevel)
     logger.debug("Starting...")
@@ -194,11 +188,5 @@ def main(args):
     logger.debug("Script ends here")
 
 
-def run():
-    """Entry point for console_scripts
-    """
-    main(sys.argv[1:])
-
-
 if __name__ == "__main__":
-    run()
+    main()

@@ -18,11 +18,8 @@ import licensename
 logger = logging.getLogger(__name__)
 
 
-def parse_args(args):
+def parse_args():
     """Parse command line parameters
-
-    Args:
-      args ([str]): command line parameters as list of strings
 
     Returns:
       :obj:`argparse.Namespace`: command line parameters namespace
@@ -58,7 +55,7 @@ def parse_args(args):
         'json_store',
         metavar='../pystyle-data/github.com/',
         help='Where to put the style files.')
-    return parser.parse_args(args)
+    return parser.parse_args()
 
 
 def setup_logging(loglevel):
@@ -238,23 +235,15 @@ def infer_style(git_store, json_store, only=None):
             json.dump(style, json_stats, indent=4, sort_keys=True)
 
 
-def main(args):
+def main():
     """Main entry point allowing external calls
-
-    Args:
-      args ([str]): command line parameter list
     """
-    args = parse_args(args)
+    args = parse_args()
     os.environ['GIT_ASKPASS'] = '/bin/true'
     setup_logging(args.loglevel)
     infer_style(args.git_store, args.json_store, args.only)
 
 
-def run():
-    """Entry point for console_scripts
-    """
-    main(sys.argv[1:])
-
 
 if __name__ == "__main__":
-    run()
+    main()

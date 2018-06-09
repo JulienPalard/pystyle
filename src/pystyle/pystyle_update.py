@@ -214,34 +214,53 @@ def infer_style_of_repo(path: Path, only: Optional[str] = None) -> Dict[
             only is None or only in key}
 
 
+class random_commit:
+    def __init__(self, repo_path: Path) -> None:
+        self.initial_commit = None
+        self.repo_path = repo_path
+
+    def pick_random_commit(self):
+        return random.choice(
+            [commit for commit in
+             subprocess.check_output(
+                 ('git', '-C', str(self.repo_path),
+                  'rev-list', self.initial_commit),
+                 universal_newlines=True).split('\n') if commit])
+
+    def __enter__(self):
+        self.initial_commit = subprocess.check_output(
+            ('git', '-C', str(self.repo_path), 'rev-parse', 'HEAD'),
+            universal_newlines=True).rstrip()
+        subprocess.check_call(('git', '-C', str(self.repo_path), 'checkout',
+                               self.pick_random_commit()))
+
+    def __exit__(self, *exc):
+        subprocess.check_call(('git', '-C', str(self.repo_path), 'checkout',
+                               self.initial_commit))
+
+
 def infer_style(git_store: Path, json_store: Path, only: str = None) -> None:
     """Compute stats file from a bunch of clones.
     """
     for path in git_store.glob('*/*/'):
-        random_commit = random.choice(
-            [commit for commit in
-             subprocess.check_output(
-                 ('git', '-C', str(path), 'rev-list', 'origin/HEAD'),
-                 universal_newlines=True).split('\n') if commit])
-        subprocess.check_call(('git', '-C', str(path), 'checkout',
-                               random_commit))
-        commit_date = subprocess.check_output(
-            ('git', '-C', str(path), 'show', '--pretty=format:%cI', '-s'),
-            universal_newlines=True)
-        style_json_path = (json_store / path.parts[-2] / path.parts[-1] /
-                           commit_date + '.json')
-        style_json_path.parent.mkdir(parents=True, exist_ok=True)
-        style = infer_style_of_repo(path, only)
-        if style_json_path.exists():
-            try:
-                with open(style_json_path, 'r') as json_stats:
-                    old_style = json.load(json_stats)
-                old_style.update(style)
-                style = old_style
-            except json.decoder.JSONDecodeError:
-                logger.warning("Malformed json in %s", style_json_path)
-        with open(style_json_path, 'w') as json_stats:
-            json.dump(style, json_stats, indent=4, sort_keys=True)
+        with random_commit(path):
+            commit_date = subprocess.check_output(
+                ('git', '-C', str(path), 'show', '--pretty=format:%cI', '-s'),
+                universal_newlines=True)
+            style_json_path = (json_store / path.parts[-2] / path.parts[-1] /
+                               (commit_date + '.json'))
+            style_json_path.parent.mkdir(parents=True, exist_ok=True)
+            style = infer_style_of_repo(path, only)
+            if style_json_path.exists():
+                try:
+                    with open(style_json_path, 'r') as json_stats:
+                        old_style = json.load(json_stats)
+                    old_style.update(style)
+                    style = old_style
+                except json.decoder.JSONDecodeError:
+                    logger.warning("Malformed json in %s", style_json_path)
+            with open(style_json_path, 'w') as json_stats:
+                json.dump(style, json_stats, indent=4, sort_keys=True)
 
 
 def main() -> None:

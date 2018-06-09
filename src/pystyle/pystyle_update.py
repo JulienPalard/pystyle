@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
         help="Only run updates matching the given pattern")
     parser.add_argument(
         'git_store',
-        metavar='./git-clones/',
+        metavar='../pystyle-clones/',
         help='Directory where git clones are stored.')
     parser.add_argument(
         'json_store',

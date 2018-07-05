@@ -30,40 +30,40 @@ def parse_args():
       :obj:`argparse.Namespace`: command line parameters namespace
     """
     parser = argparse.ArgumentParser(
-        description="Crawl github Python repositories and infer their style.")
+        description="Crawl github Python repositories and infer their style."
+    )
     parser.add_argument(
-        '--version',
-        action='version',
-        version='pystyle {ver}'.format(ver=__version__))
+        "--version", action="version", version="pystyle {ver}".format(ver=__version__)
+    )
     parser.add_argument(
-        '-v',
-        '--verbose',
+        "-v",
+        "--verbose",
         dest="loglevel",
         help="set loglevel to INFO",
-        action='store_const',
-        const=logging.INFO)
+        action="store_const",
+        const=logging.INFO,
+    )
     parser.add_argument(
-        '-vv',
-        '--very-verbose',
+        "-vv",
+        "--very-verbose",
         dest="loglevel",
         help="set loglevel to DEBUG",
-        action='store_const',
-        const=logging.DEBUG)
+        action="store_const",
+        const=logging.DEBUG,
+    )
     parser.add_argument(
-        '--repository',
-        help='Crawl a specific repository',
-        metavar='https://github.com/julienpalard/pystyle/',
-        type=str)
+        "--repository",
+        help="Crawl a specific repository",
+        metavar="https://github.com/julienpalard/pystyle/",
+        type=str,
+    )
+    parser.add_argument("--pypi-project", help="Fetch a single PyPI project")
     parser.add_argument(
-        '--pypi-project',
-        help='Fetch a single PyPI project')
+        "git_store", metavar="./git-clones/", help="Directory to store git clones."
+    )
     parser.add_argument(
-        'git_store',
-        metavar='./git-clones/',
-        help='Directory to store git clones.')
-    parser.add_argument(
-        '--reclone',
-        help="Re clone from given pystyle-data to git_store.")
+        "--reclone", help="Re clone from given pystyle-data to git_store."
+    )
     return parser.parse_args()
 
 
@@ -74,15 +74,16 @@ def setup_logging(loglevel):
       loglevel (int): minimum loglevel for emitting messages
     """
     logformat = "[%(asctime)s] %(levelname)s:%(name)s:%(message)s"
-    logging.basicConfig(level=loglevel, stream=sys.stdout,
-                        format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(
+        level=loglevel, stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
 
 def is_github_project_url(url):
     """Returns True if the URL looks like a github project URL. False
     otherwise.
     """
-    return re.match('https://github.com/[^/]+/[^/]+/?', url) is not None
+    return re.match("https://github.com/[^/]+/[^/]+/?", url) is not None
 
 
 def git_clone_or_update(clone_url, clone_path):
@@ -92,16 +93,18 @@ def git_clone_or_update(clone_url, clone_path):
     if os.path.isdir(clone_path):
         logger.debug("Git pull on: %s", clone_path)
         try:
-            subprocess.run(['git', '-C', clone_path, 'pull', '--ff-only'],
-                           check=True)
+            subprocess.run(["git", "-C", clone_path, "pull", "--ff-only"], check=True)
             return
         except subprocess.CalledProcessError:
             shutil.rmtree(clone_path)
     os.makedirs(clone_path)
     logger.debug("Git clone: %s", clone_url)
     try:
-        subprocess.run(['git', 'clone', clone_url, clone_path],
-                       stdin=subprocess.DEVNULL, check=True)
+        subprocess.run(
+            ["git", "clone", clone_url, clone_path],
+            stdin=subprocess.DEVNULL,
+            check=True,
+        )
     except subprocess.CalledProcessError:
         logger.error("Clone failed for repo %s", clone_url)
         shutil.rmtree(clone_path, ignore_errors=True)
@@ -113,12 +116,10 @@ def clone_repository(github_project_url, clones_path=None, clone_path=None):
     - Will clone the project in a directory in clones_path.
     - Or clone the project in clone_path.
     """
-    github_project_url = github_project_url.rstrip('/')
-    clone_url = github_project_url + '.git'
+    github_project_url = github_project_url.rstrip("/")
+    clone_url = github_project_url + ".git"
     if clones_path:
-        clone_path = os.path.join(
-            clones_path,
-            urlparse(github_project_url).path[1:])
+        clone_path = os.path.join(clones_path, urlparse(github_project_url).path[1:])
     git_clone_or_update(clone_url, clone_path)
 
 
@@ -126,10 +127,9 @@ def pypi_url_to_github_url(pypi_package_url):
     """By querying the PyPI API, try to find the github page of a pypi project.
     """
     project_response = requests.get(pypi_package_url)
-    soup = BeautifulSoup(project_response.content, "html5lib",
-                         from_encoding='UTF8')
-    for element in soup.select('div.sidebar-section a i.fa-github'):
-        github_url = element.parent.get('href')
+    soup = BeautifulSoup(project_response.content, "html5lib", from_encoding="UTF8")
+    for element in soup.select("div.sidebar-section a i.fa-github"):
+        github_url = element.parent.get("href")
         if is_github_project_url(github_url):
             return github_url
     return None
@@ -148,18 +148,15 @@ def crawl_pypi_project(git_store, pypi_package_url):
 def crawl_pypi():
     """Crawl PyPI via RSS, return a list of pypi projects.
     """
-    updates = feedparser.parse(
-        'https://pypi.org/rss/updates.xml')
-    packages = feedparser.parse(
-        'https://pypi.org/rss/packages.xml')
-    return set(package['link'] for package in
-               updates['items'] + packages['items'])
+    updates = feedparser.parse("https://pypi.org/rss/updates.xml")
+    packages = feedparser.parse("https://pypi.org/rss/packages.xml")
+    return set(package["link"] for package in updates["items"] + packages["items"])
 
 
 def reclone(git_store: str, pystyle_data_path: Union[str, Path]) -> None:
     pystyle_data_path = Path(pystyle_data_path)
-    if (pystyle_data_path / Path('github.com')).exists():
-        github = pystyle_data_path / Path('github.com')
+    if (pystyle_data_path / Path("github.com")).exists():
+        github = pystyle_data_path / Path("github.com")
     else:
         github = pystyle_data_path
     with Pool(processes=4) as pool:
@@ -167,8 +164,9 @@ def reclone(git_store: str, pystyle_data_path: Union[str, Path]) -> None:
             for project in org.iterdir():
                 pool.apply_async(
                     clone_repository,
-                    (f"https://github.com/{org.stem}/{project.stem}", ),
-                    {'clones_path': git_store})
+                    (f"https://github.com/{org.stem}/{project.stem}",),
+                    {"clones_path": git_store},
+                )
         pool.close()
         pool.join()
 
@@ -177,7 +175,7 @@ def main():
     """Main entry point allowing external calls
     """
     args = parse_args()
-    os.environ['GIT_ASKPASS'] = '/bin/true'
+    os.environ["GIT_ASKPASS"] = "/bin/true"
     setup_logging(args.loglevel)
     logger.debug("Starting...")
     if args.repository:

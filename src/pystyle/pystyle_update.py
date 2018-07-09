@@ -53,6 +53,34 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def detect_test_engine(repo_path: Path) -> Dict[str, str]:
+    """Look for hints about the test engine used by the given repo.
+    """
+    detected_engines: Counter = Counter()
+    files_to_search = [
+        "README.txt",
+        "README",
+        "README.md",
+        "README.rst",
+        "tox.ini",
+        "requirements.txt",
+        "requirements-dev.txt",
+        "requirements_dev.txt",
+        "dev-requirements.txt",
+        "requirements-test.txt",
+        "test-requirements.txt",
+        "test_requirements.txt",
+    ]
+    known_engines = ["nose", "pytest", "unittest"]
+    for file_to_search in files_to_search:
+        if (repo_path / file_to_search).exists():
+            tox_text = (repo_path / file_to_search).read_text()
+            for engine in known_engines:
+                if engine in tox_text:
+                    detected_engines[engine] += 1
+    return {"test_engine": detected_engines.most_common(1)[0][0]}
+
+
 def has_typical_dirs(repo_path: Path) -> Dict[str, int]:
     """Given a path to a git clone, returns a dict of present/absent
     directories.
@@ -250,6 +278,7 @@ def infer_style_of_repo(
         "has_file": has_typical_files,
         "has_dir": has_typical_dirs,
         "license": infer_license,
+        "detect_test_engine": detect_test_engine,
         # 'lines_of_code': count_lines_of_code,
         # 'pep8_infringement': count_pep8_infringement,
         "shebang": count_shebangs,

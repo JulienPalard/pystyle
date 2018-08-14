@@ -41,6 +41,11 @@ def parse_args() -> argparse.Namespace:
         help="Verbose mode (-vv for more, -vvv, …)",
         action="count",
     )
+    parser.add_argument(
+        "--update",
+        help="Do not search for new commits but update an existing stats file",
+        action="store_true",
+    )
     parser.add_argument("--only", help="Only run updates matching the given pattern")
     parser.add_argument(
         "git_store",
@@ -78,7 +83,10 @@ def detect_test_engine(repo_path: Path) -> Dict[str, str]:
             for engine in known_engines:
                 if engine in tox_text:
                     detected_engines[engine] += 1
-    return {"test_engine": detected_engines.most_common(1)[0][0]}
+    try:
+        return {"test_engine": detected_engines.most_common(1)[0][0]}
+    except IndexError:
+        return {"test_engine": ""}
 
 
 def has_typical_dirs(repo_path: Path) -> Dict[str, int]:
@@ -140,8 +148,7 @@ def infer_license(repo_path: Path) -> Dict[str, str]:
             license_name = licensename.from_file(license_path)
             if license_name is not None:
                 return {"license": license_name}
-            else:
-                logger.warning("Unknown license for %s", license_path)
+            logger.warning("Unknown license for %s", license_path)
 
         except (FileNotFoundError, UnicodeDecodeError):
             continue
@@ -309,7 +316,22 @@ class random_commit:
             ]
         )
 
+    def fix_checkout(self):
+        status = subprocess.check_output(["git", "-C", str(self.repo_path), "status"],
+                                         universal_newlines=True)
+        if b"detached at" not in status:
+            return
+        logger.info("Trying to fix checkout of %r", self.repo_path)
+        branches = subprocess.check_output(["git", "-C", str(self.repo_path), "branch"])
+        upstream_branch = [
+            branch.strip() for branch in branches.split("\n") if " " not in branch
+        ][0]
+        subprocess.check_output(
+            ["git", "-C", str(self.repo_path), "checkout", "-f", upstream_branch]
+        )
+
     def __enter__(self):
+        self.fix_checkout()
         self.initial_commit = subprocess.check_output(
             ("git", "-C", str(self.repo_path), "rev-parse", "HEAD"),
             universal_newlines=True,
@@ -317,7 +339,7 @@ class random_commit:
         commit = self.pick_random_commit()
         logger.info("Checking out random commit %r", commit)
         subprocess.check_call(
-            ("git", "-C", str(self.repo_path), "checkout", commit),
+            ("git", "-C", str(self.repo_path), "checkout", "-f", commit),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -326,7 +348,7 @@ class random_commit:
     def __exit__(self, *exc):
         logger.info("Checking out back to %r", self.initial_commit)
         subprocess.check_call(
-            ("git", "-C", str(self.repo_path), "checkout", self.initial_commit),
+            ("git", "-C", str(self.repo_path), "checkout", "-f", self.initial_commit),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -342,11 +364,27 @@ def infer_style(repo: Path, only: str = None) -> Optional[Dict[str, Union[str, i
             )
             style = infer_style_of_repo(repo, only)
             style["commit"] = commit
+            style["repo"] = str(repo)
             style["date"] = commit_date
             return style
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
+        import traceback
+
+        traceback.print_exc()
         logger.exception(f"Unhandled exception while infering style of {repo!r}")
         return None
+
+
+def update_style_of_all_repos(
+    git_store: Path, stats_csv: Path, only: str = None
+) -> None:
+    """Recompute the stats of an existing stats file.
+    """
+    with open(stats_csv) as csv_file, Pool(processes=4) as pool:
+        reader = csv.DictReader(csv_file)
+        all_styles = pool.starmap(
+            update_style, [(path, only) for path in git_store.glob("*/*/*/")]
+        )
 
 
 def infer_style_of_all_repos(
@@ -356,9 +394,11 @@ def infer_style_of_all_repos(
     """
     with Pool(processes=8) as pool:
         all_styles = pool.starmap(
-            infer_style, [(path, only) for path in git_store.glob("*/*/")]
+            infer_style, [(path, only) for path in git_store.glob("*/*/*/")]
         )
     all_styles = [style for style in all_styles if style is not None]
+    for style in all_styles:
+        style["repo"] = Path(style["repo"]).relative_to(git_store)
     headers = {key for style in all_styles for key in set(style)}
     with open(stats_csv, "w") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=list(headers))
@@ -377,7 +417,10 @@ def main() -> None:
         format="[%(asctime)s] %(levelname)s:%(name)s:%(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    infer_style_of_all_repos(Path(args.git_store), Path(args.stats_csv), args.only)
+    if not args.update:
+        infer_style_of_all_repos(Path(args.git_store), Path(args.stats_csv), args.only)
+    else:
+        update_style(Path(args.git_store), Path(args.stats_csv), args.only)
 
 
 if __name__ == "__main__":

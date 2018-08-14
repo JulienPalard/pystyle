@@ -20,8 +20,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'pystyle-crawl=pystyle.pystyle_crawl:main',
-            'pystyle-update=pystyle.pystyle_update:main',
+            'pystyle-crawl=pystyle.crawl:main',
+            'pystyle-update=pystyle.update:main',
         ]
     },
     install_requires=[

@@ -37,6 +37,7 @@ setup(
             'flake8==3.5.0',
             'mypy==0.600',
             'pylint==1.8.4',
+            'black',
         ]
     },
     license="MIT license",

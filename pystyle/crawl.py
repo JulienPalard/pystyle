@@ -64,6 +64,11 @@ def parse_args():
     parser.add_argument(
         "--reclone", help="Re clone from given pystyle-data to git_store."
     )
+    parser.add_argument(
+        "--top360",
+        help="Download the top360 packets from pythonwheels.com",
+        action="store_true",
+    )
     return parser.parse_args()
 
 
@@ -153,6 +158,16 @@ def crawl_pypi():
     return set(package["link"] for package in updates["items"] + packages["items"])
 
 
+def crawl_pythonwheels():
+    """Crawl pythonwheels.com, return a list of pypi projects.
+    """
+    pythonwheels = requests.get("https://pythonwheels.com/results.json").json()
+    return set(
+        f"https://pypi.org/project/{project['name']}"
+        for project in pythonwheels["data"]
+    )
+
+
 def reclone(git_store: str, pystyle_data_path: Union[str, Path]) -> None:
     pystyle_data_path = Path(pystyle_data_path)
     if (pystyle_data_path / Path("github.com")).exists():
@@ -182,6 +197,10 @@ def main():
         clone_repository(args.repository, clones_path=args.git_store)
     elif args.pypi_project:
         crawl_pypi_project(args.git_store, args.pypi_project)
+    elif args.top360:
+        pypi_projects = crawl_pythonwheels()
+        for pypi_project in pypi_projects:
+            crawl_pypi_project(args.git_store, pypi_project)
     elif args.reclone:
         reclone(args.git_store, args.reclone)
     else:

@@ -293,13 +293,23 @@ def infer_style_of_repo(
         "requirements": infer_requirements,
     }
     result: Dict[str, Union[int, str]] = {}
-    for method_name, method in methods.items():
-        if only is None or only in method_name:
-            result.update(method(path))
+    try:
+        for method_name, method in methods.items():
+            if only is None or only in method_name:
+                result.update(method(path))
+    except Exception:  # pylint: disable=broad-except
+        import traceback
+
+        traceback.print_exc()
+        logger.exception(f"Unhandled exception while infering style of {path!r}")
+
     return result
 
 
 class random_commit:
+    """Context manager to temporarily checkout a random commit in an history
+    """
+
     def __init__(self, repo_path: Path) -> None:
         self.initial_commit = None
         self.repo_path = repo_path
@@ -317,8 +327,9 @@ class random_commit:
         )
 
     def fix_checkout(self):
-        status = subprocess.check_output(["git", "-C", str(self.repo_path), "status"],
-                                         universal_newlines=True)
+        status = subprocess.check_output(
+            ["git", "-C", str(self.repo_path), "status"], universal_newlines=True
+        )
         if b"detached at" not in status:
             return
         logger.info("Trying to fix checkout of %r", self.repo_path)
@@ -354,25 +365,54 @@ class random_commit:
         )
 
 
+class commit:
+    """Context manager to temporarily checkout a given commit.
+    """
+
+    def __init__(self, repo_path: Path, commit: str) -> None:
+        self.initial_commit = None
+        self.target_commit = commit
+        self.repo_path = repo_path
+
+    def __enter__(self):
+        self.initial_commit = subprocess.check_output(
+            ("git", "-C", str(self.repo_path), "rev-parse", "HEAD"),
+            universal_newlines=True,
+        ).rstrip()
+        logger.info("Checking out random commit %r", self.target_commit)
+        subprocess.check_call(
+            ("git", "-C", str(self.repo_path), "checkout", "-f", self.target_commit),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return commit
+
+    def __exit__(self, *exc):
+        logger.info("Checking out back to %r", self.initial_commit)
+        subprocess.check_call(
+            ("git", "-C", str(self.repo_path), "checkout", "-f", self.initial_commit),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
 def infer_style(repo: Path, only: str = None) -> Optional[Dict[str, Union[str, int]]]:
     logger.info("Working on repo %r", repo)
-    try:
-        with random_commit(repo) as commit:
-            commit_date = subprocess.check_output(
-                ("git", "-C", str(repo), "show", "--pretty=format:%cI", "-s"),
-                universal_newlines=True,
-            )
-            style = infer_style_of_repo(repo, only)
-            style["commit"] = commit
-            style["repo"] = str(repo)
-            style["date"] = commit_date
-            return style
-    except Exception:  # pylint: disable=broad-except
-        import traceback
+    with random_commit(repo) as commit:
+        commit_date = subprocess.check_output(
+            ("git", "-C", str(repo), "show", "--pretty=format:%cI", "-s"),
+            universal_newlines=True,
+        )
+        style = infer_style_of_repo(repo, only)
+        style.update({"commit": commit, "repo": str(repo), "date": commit_date})
+        return style
 
-        traceback.print_exc()
-        logger.exception(f"Unhandled exception while infering style of {repo!r}")
-        return None
+
+def update_style(git_store: Path, only: str, line: dict):
+    repo = git_store / line["repo"]
+    with commit(repo, line["commit"]):
+        line.update(infer_style_of_repo(repo, only))
+        return line
 
 
 def update_style_of_all_repos(
@@ -380,11 +420,21 @@ def update_style_of_all_repos(
 ) -> None:
     """Recompute the stats of an existing stats file.
     """
-    with open(stats_csv) as csv_file, Pool(processes=4) as pool:
-        reader = csv.DictReader(csv_file)
+    with open(stats_csv, "r", newline="\n") as csv_file, Pool(processes=4) as pool:
+        reader = csv.DictReader(csv_file, dialect=csv.unix_dialect)
         all_styles = pool.starmap(
-            update_style, [(path, only) for path in git_store.glob("*/*/*/")]
+            update_style, ((git_store, only, line) for line in reader)
         )
+        fieldnames = reader.fieldnames
+    all_styles = [style for style in all_styles if style is not None]
+    with open(
+        str(stats_csv).replace(".csv", "-new.csv"), "w", newline="\n"
+    ) as csv_file:
+        writer = csv.DictWriter(
+            csv_file, fieldnames=fieldnames, dialect=csv.unix_dialect
+        )
+        writer.writeheader()
+        writer.writerows(all_styles)
 
 
 def infer_style_of_all_repos(
@@ -401,7 +451,9 @@ def infer_style_of_all_repos(
         style["repo"] = Path(style["repo"]).relative_to(git_store)
     headers = {key for style in all_styles for key in set(style)}
     with open(stats_csv, "w") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=list(headers))
+        writer = csv.DictWriter(
+            csv_file, fieldnames=list(headers), dialect=csv.unix_dialect
+        )
         writer.writeheader()
         writer.writerows(all_styles)
 
@@ -420,7 +472,7 @@ def main() -> None:
     if not args.update:
         infer_style_of_all_repos(Path(args.git_store), Path(args.stats_csv), args.only)
     else:
-        update_style(Path(args.git_store), Path(args.stats_csv), args.only)
+        update_style_of_all_repos(Path(args.git_store), Path(args.stats_csv), args.only)
 
 
 if __name__ == "__main__":
